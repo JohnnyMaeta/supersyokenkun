@@ -7,6 +7,7 @@ const GEMINI_MODEL = 'gemini-2.0-flash-001';
 const PROP_API_KEY = 'GEMINI_API_KEY';
 const PROP_STYLE_PROFILE = 'STYLE_PROFILE_V1';
 const SHEET_SAMPLES = '文体サンプル';
+const SHEET_PROFILE = '文体プロファイル';
 
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
@@ -15,6 +16,8 @@ function onOpen() {
     .addSeparator()
     .addItem('文体サンプル用シートを作成/表示', 'ensureSampleSheet')
     .addItem('文体分析を実行（サンプルシート）', 'analyzeMyStyle')
+    .addItem('文体プロファイルを表示・編集', 'showProfileSheet')
+    .addItem('文体プロファイルを再読込', 'loadProfileFromSheet')
     .addSeparator()
     .addItem('APIキー設定', 'showSidebar')
     .addToUi();
@@ -67,6 +70,79 @@ function ensureSampleSheet() {
   return true;
 }
 
+function showProfileSheet() {
+  const ss = SpreadsheetApp.getActive();
+  let sh = ss.getSheetByName(SHEET_PROFILE);
+  if (!sh) {
+    // sh = ss.insertSheet(SHEET_PROFILE);
+    // sh.getRange('A1').setValue('ここにプロファイルが表示されます。先に文体分析を実行してください。');
+    throw new Error('文体プロファイルシートがまだ作成されていません。先に文体分析を実行してください。');
+  }
+  ss.setActiveSheet(sh);
+  return true;
+}
+
+function loadProfileFromSheet() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(SHEET_PROFILE);
+  if (!sh) {
+    throw new Error('文体プロファイルシートが見つかりません。');
+  }
+  const data = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+  const profile = {};
+  const arrayKeys = ['dos', 'donts', 'phrase_bank', 'closing_patterns'];
+
+  data.forEach(row => {
+    const key = row[0];
+    const value = row[1];
+    if (key) {
+      if (arrayKeys.includes(key)) {
+        profile[key] = value.toString().split('\n').map(s => s.trim()).filter(s => s);
+      } else {
+        profile[key] = value;
+      }
+    }
+  });
+
+  if (!profile.style_name || !profile.summary) {
+    throw new Error('シートからプロファイルを正しく読み込めませんでした。項目名が変更されていないか確認してください。');
+  }
+
+  PropertiesService.getUserProperties().setProperty(PROP_STYLE_PROFILE, JSON.stringify(profile));
+  return summarizeStyleProfile_(profile);
+}
+
+function writeProfileToSheet_(profile) {
+  const ss = SpreadsheetApp.getActive();
+  let sh = ss.getSheetByName(SHEET_PROFILE);
+  if (!sh) {
+    sh = ss.insertSheet(SHEET_PROFILE);
+  }
+  sh.clear();
+  sh.getRange('A1:B1').setValues([['項目', '内容']]).setFontWeight('bold');
+  sh.setFrozenRows(1);
+
+  const rows = [];
+  const keys = Object.keys(profile);
+
+  keys.forEach(key => {
+    const value = profile[key];
+    if (Array.isArray(value)) {
+      rows.push([key, value.join('\n')]);
+    } else {
+      rows.push([key, value]);
+    }
+  });
+
+  sh.getRange(2, 1, rows.length, 2).setValues(rows).setWrap(true).setVerticalAlignment('top');
+  sh.setColumnWidth(1, 200);
+  sh.setColumnWidth(2, 600);
+
+  const note = 'このシートの内容を編集してから、メニューやサイドバーの「文体プロファイルを再読込」を実行すると、生成される文章に反映されます。\n' +
+               'dos, donts, phrase_bank, closing_patterns の各項目は改行区切りで複数項目を編集できます。';
+  sh.getRange('B1').setNote(note);
+  ss.setActiveSheet(sh);
+}
+
 // 文体分析
 function analyzeMyStyle() {
   const samples = readSamples_();
@@ -74,7 +150,13 @@ function analyzeMyStyle() {
     throw new Error('サンプル文が不足しています。最低5件以上（推奨10件）を ' + SHEET_SAMPLES + ' シートのA列に貼り付けてください。');
   }
   const profile = analyzeStyleWithGemini_(samples);
+  
+  writeProfileToSheet_(profile);
+
   PropertiesService.getUserProperties().setProperty(PROP_STYLE_PROFILE, JSON.stringify(profile));
+  
+  SpreadsheetApp.getUi().alert('文体分析が完了し、結果を「' + SHEET_PROFILE + '」シートに書き出しました。内容は直接編集可能です。');
+
   return summarizeStyleProfile_(profile);
 }
 

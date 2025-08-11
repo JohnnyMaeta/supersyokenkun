@@ -55,6 +55,10 @@
       <button id="analyzeBtn">私の文体を分析する</button>
     </div>
     <div class="row">
+      <button id="showProfileBtn" style="margin-right: 8px;">文体プロファイルを表示・編集</button>
+      <button id="loadProfileBtn">編集したプロファイルを再読込</button>
+    </div>
+    <div class="row">
       <div id="styleSummary" class="out" style="display:none;"></div>
     </div>
     <div class="hint">
@@ -152,11 +156,47 @@
           'B: ' + (summary.B_sentence_structure || '-') + '\n' +
           'D: ' + (summary.D_overall_tone || '-') + '\n' +
           '最終更新: ' + summary.updatedAt;
-        alert('文体プロファイルを保存しました。');
+        // The alert is now handled in the backend
       }).withFailureHandler(function(err) {
         setBusy(btn, false);
         alert(err.message || err);
       }).analyzeMyStyle();
+    });
+
+    document.getElementById('showProfileBtn').addEventListener('click', function() {
+      const btn = this;
+      btn.dataset.normalText = '文体プロファイルを表示・編集';
+      btn.dataset.busyText = '表示中...';
+      setBusy(btn, true);
+      google.script.run.withSuccessHandler(function() {
+        setBusy(btn, false);
+      }).withFailureHandler(function(err) {
+        setBusy(btn, false);
+        alert(err.message || err);
+      }).showProfileSheet();
+    });
+
+    document.getElementById('loadProfileBtn').addEventListener('click', function() {
+      const btn = this;
+      btn.dataset.normalText = '編集したプロファイルを再読込';
+      btn.dataset.busyText = '読込中...';
+      setBusy(btn, true);
+      google.script.run.withSuccessHandler(function(summary) {
+        setBusy(btn, false);
+        const el = document.getElementById('styleSummary');
+        el.style.display = 'block';
+        el.textContent =
+          '文体名: ' + (summary.style_name || '-') + '\n' +
+          '概要: ' + (summary.summary || '-') + '\n' +
+          'B: ' + (summary.B_sentence_structure || '-') + '\n' +
+          'D: ' + (summary.D_overall_tone || '-') + '\n' +
+          '最終更新: ' + summary.updatedAt;
+        alert('シートから文体プロファイルを再読込し、保存しました。');
+        refreshInit();
+      }).withFailureHandler(function(err) {
+        setBusy(btn, false);
+        alert(err.message || err);
+      }).loadProfileFromSheet();
     });
 
     document.getElementById('genBtn').addEventListener('click', function() {
