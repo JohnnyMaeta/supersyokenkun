@@ -55,6 +55,17 @@ function saveApiKey(key) {
   return true;
 }
 
+function deleteApiKey() {
+  const userProps = PropertiesService.getUserProperties();
+  userProps.deleteProperty(PROP_API_KEY);
+  
+  // 念のためスクリプトプロパティからも削除試行
+  const scriptProps = PropertiesService.getScriptProperties();
+  scriptProps.deleteProperty(PROP_API_KEY);
+
+  return true; // 成功を示す
+}
+
 function ensureSampleSheet() {
   const ss = SpreadsheetApp.getActive();
   let sh = ss.getSheetByName(SHEET_SAMPLES);
@@ -184,6 +195,8 @@ function generateRemark(input) {
   input = input || {};
   const memoText = input.memoText;
   const goalCode = input.goalCode;
+  const charCount = input.charCount;
+  const gradeLevel = input.gradeLevel;
   if (!memoText || !goalCode) throw new Error('メモとゴールを指定してください。');
 
   const ss = SpreadsheetApp.getActive();
@@ -197,7 +210,7 @@ function generateRemark(input) {
   const memos = memoText.split(/\r?\n/).map(function(s){ return s.trim(); }).filter(function(s){ return !!s; }).map(sanitizeForPrivacy_);
   if (memos.length === 0) throw new Error('箇条書きメモが空です。');
 
-  const resultText = generateRemarkWithGemini_(memos, goalCode, styleProfile);
+  const resultText = generateRemarkWithGemini_(memos, goalCode, styleProfile, charCount, gradeLevel);
   range.setWrap(true).setValue(resultText);
 
   return {
@@ -252,17 +265,22 @@ function analyzeStyleWithGemini_(samples) {
 }
 
 // Gemini呼び出し：所見生成
-function generateRemarkWithGemini_(memos, goalCode, styleProfile) {
+function generateRemarkWithGemini_(memos, goalCode, styleProfile, charCount, gradeLevel) {
   const goalSpec = goalToSpec_(goalCode);
   const styleGuidance = styleProfile ? formatStyleGuidance_(styleProfile) : '丁寧で温かく、簡潔かつ客観性を保った「です・ます調」で書く。';
   const privacyGuard = [
     '固有名詞（生徒名、学校名、具体的な大会名等）は出力に含めない。',
     '学期や回数などの数値は一般化して表現する（例：「複数回」「学期当初」など）。'
   ].join('\n');
+  const gradeSpec = gradeToSpec_(gradeLevel);
+  const lengthSpec = charCount ? `文字量の目安: ${charCount}字程度（厳密でなくてよい）。` : `文字量の目安: ${goalSpec.recommendedLength}（厳密でなくてよい）。`;
 
   const prompt = [
     'あなたは日本の学校教員が用いる通知表の所見文を作成する専門アシスタントです。',
     '以下の条件で、日本語の単一段落（必要なら2段落まで）で所見文を作成してください。',
+    '',
+    '【対象読者】',
+    gradeSpec,
     '',
     '【文体指針】',
     styleGuidance,
@@ -281,7 +299,7 @@ function generateRemarkWithGemini_(memos, goalCode, styleProfile) {
     '',
     '【出力フォーマット】',
     '- 日本語の自然な文章。箇条書きは使用しない。',
-    '- 文字量の目安: ' + goalSpec.recommendedLength + '（厳密でなくてよい）。',
+    `- ${lengthSpec}`,
     '- 最後は前向きな締めで終える。'
   ].join('\n');
 
@@ -363,6 +381,29 @@ function sanitizeForPrivacy_(s) {
   out = out.replace(/([一-龥A-Za-z0-9]+)小学校|([一-龥A-Za-z0-9]+)中学校|([一-龥A-Za-z0-9]+)高等学校/g, 'ある学校');
   out = out.replace(/([1-6])年([1-9])組/g, 'ある学年の学級');
   return out.trim();
+}
+
+function gradeToSpec_(gradeLevel) {
+  switch (gradeLevel) {
+    case 'elementary_1':
+      return '読者は小学校1年生とその保護者です。ひらがな中心の、非常に簡単で具体的な言葉を選び、学校生活の基本的な様子が伝わるようにしてください。';
+    case 'elementary_2':
+      return '読者は小学校2年生とその保護者です。簡単で具体的な言葉を中心にしつつ、少しだけ漢字を交ぜた表現を意識してください。';
+    case 'elementary_3':
+      return '読者は小学校3年生とその保護者です。抽象的な概念（協力、工夫など）を簡単な言葉で表現し、本人の思考が垣間見えるような記述を心がけてください。';
+    case 'elementary_4':
+      return '読者は小学校4年生とその保護者です。本人が理解できる範囲で、少し知的な語彙を使い、論理的な思考の芽生えを示すような表現が望ましいです。';
+    case 'elementary_5':
+      return '読者は小学校5年生とその保護者です。高学年としての自覚や、集団の中での役割を意識した言葉を選んでください。';
+    case 'elementary_6':
+      return '読者は小学校6年生とその保護者です。中学校進学を視野に入れ、自立心や将来への期待を促すような、少し大人びた表現を含めてください。';
+    case 'middle_school':
+      return '読者は中学生本人とその保護者です。本人の自覚を促すような、客観的で少し大人びた表現を意識してください。';
+    case 'high_school':
+      return '読者は高校生本人とその保護者です。自立した個人として尊重し、将来を見据えた客観的な事実と期待を伝えてください。';
+    default:
+      return '読者は児童・生徒本人とその保護者です。';
+  }
 }
 
 function goalToSpec_(goalCode) {

@@ -39,6 +39,25 @@
         <option value="C">C：次への具体的な行動を促す</option>
       </select>
     </div>
+    <div class="row" style="display: flex; align-items: center; gap: 16px;">
+      <div>
+        <label>およその文字数</label>
+        <input type="number" id="charCountInput" placeholder="220" style="width: 60px;"/>
+      </div>
+      <div>
+        <label>対象学年</label>
+        <select id="gradeLevelSelect">
+            <option value="elementary_1" selected>小学校1年生</option>
+            <option value="elementary_2">小学校2年生</option>
+            <option value="elementary_3">小学校3年生</option>
+            <option value="elementary_4">小学校4年生</option>
+            <option value="elementary_5">小学校5年生</option>
+            <option value="elementary_6">小学校6年生</option>
+            <option value="middle_school">中学生</option>
+            <option value="high_school">高校生</option>
+        </select>
+      </div>
+    </div>
     <div class="row">
       <button id="genBtn">所見を生成</button>
     </div>
@@ -74,6 +93,7 @@
     </div>
     <div class="row">
       <button id="saveKeyBtn">APIキーを保存</button>
+      <button id="deleteKeyBtn" style="margin-left: 8px;">削除</button>
       <span id="apiStatus" class="status"></span>
     </div>
   </div>
@@ -121,10 +141,32 @@
         setBusy(btn, false);
         document.getElementById('apiStatus').textContent = 'APIキーを保存しました。';
         document.getElementById('apiStatus').className = 'status ok';
+        refreshInit();
       }).withFailureHandler(function(err) {
         setBusy(btn, false);
         alert(err.message || err);
       }).saveApiKey(key);
+    });
+
+    document.getElementById('deleteKeyBtn').addEventListener('click', function() {
+      const confirmed = confirm('保存されているAPIキーを本当に削除しますか？');
+      if (!confirmed) {
+        return;
+      }
+
+      const btn = this;
+      btn.dataset.normalText = '削除';
+      btn.dataset.busyText = '削除中...';
+      setBusy(btn, true);
+      google.script.run.withSuccessHandler(function() {
+        setBusy(btn, false);
+        document.getElementById('apiKeyInput').value = '';
+        alert('APIキーを削除しました。');
+        refreshInit(); 
+      }).withFailureHandler(function(err) {
+        setBusy(btn, false);
+        alert(err.message || err);
+      }).deleteApiKey();
     });
 
     document.getElementById('sampleBtn').addEventListener('click', function() {
@@ -202,6 +244,9 @@
     document.getElementById('genBtn').addEventListener('click', function() {
       const memoText = document.getElementById('memoInput').value;
       const goalCode = document.getElementById('goalSelect').value;
+      const charCount = document.getElementById('charCountInput').value;
+      const gradeLevel = document.getElementById('gradeLevelSelect').value;
+
       const btn = this;
       btn.dataset.normalText = '所見を生成';
       btn.dataset.busyText = '生成中...';
@@ -221,7 +266,7 @@
       }).withFailureHandler(function(err) {
         setBusy(btn, false);
         alert(err.message || err);
-      }).generateRemark({ memoText, goalCode });
+      }).generateRemark({ memoText, goalCode, charCount, gradeLevel });
     });
 
     // 初期化
