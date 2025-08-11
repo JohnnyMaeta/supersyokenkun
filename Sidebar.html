@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif; padding: 12px; }
+    h2 { font-size: 16px; margin: 12px 0 8px; }
+    .section { border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px; margin-bottom: 12px; }
+    .row { margin: 6px 0; }
+    textarea { width: 100%; min-height: 120px; }
+    select, input[type="text"] { width: 100%; }
+    button { padding: 6px 10px; }
+    .hint { color: #666; font-size: 12px; }
+    .status { font-size: 12px; color: #333; }
+    .ok { color: #1565c0; }
+    .warn { color: #c62828; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    .out { white-space: pre-wrap; background: #fafafa; border: 1px solid #eee; padding: 8px; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <h1 style="font-size:18px;margin:0 0 10px;">通知表所見アシスト</h1>
+
+  <div class="section">
+    <h2>所見生成</h2>
+    <div class="row status">
+      出力先: <span id="activeCell" class="mono"></span>
+    </div>
+    <div class="row">
+      <label>箇条書きメモ（個人が特定されない一般的な内容のみ。1行=1項目）</label>
+      <textarea id="memoInput" placeholder="- 学習への姿勢が安定\n- グループ活動で傾聴ができる\n- 苦手単元は計算の見直しに改善の余地 など"></textarea>
+      <div class="hint">具体的な氏名・大会名・学校名・日付などは書かないでください。</div>
+    </div>
+    <div class="row">
+      <label>ゴール</label>
+      <select id="goalSelect">
+        <option value="A">A：生徒の成長を物語として示す</option>
+        <option value="B">B：保護者に安心感と期待感を与える</option>
+        <option value="C">C：次への具体的な行動を促す</option>
+      </select>
+    </div>
+    <div class="row">
+      <button id="genBtn">所見を生成</button>
+    </div>
+    <div id="genResult" class="out" style="display:none;"></div>
+    <div id="genWritten" class="status ok" style="display:none;"></div>
+  </div>
+
+  <div class="section">
+    <h2>文体分析（初回セットアップ）</h2>
+    <div class="row">
+      <button id="sampleBtn">文体サンプル用シートを作成/表示</button>
+    </div>
+    <div class="row">
+      <button id="analyzeBtn">私の文体を分析する</button>
+    </div>
+    <div class="row">
+      <div id="styleSummary" class="out" style="display:none;"></div>
+    </div>
+    <div class="hint">
+      サンプルはA列に1セル=1件で10件程度が目安。具体的な固有名詞は避けてください。
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>設定</h2>
+    <div class="row">
+      <label>Gemini API Key</label>
+      <input type="text" id="apiKeyInput" placeholder="AI Studio で取得したキーを貼り付け" />
+    </div>
+    <div class="row">
+      <button id="saveKeyBtn">APIキーを保存</button>
+      <span id="apiStatus" class="status"></span>
+    </div>
+  </div>
+
+  <script>
+    let initState = null;
+
+    function setBusy(btn, busy) {
+      if (!btn) return;
+      btn.disabled = !!busy;
+      btn.textContent = busy ? (btn.dataset.busyText || '処理中...') : (btn.dataset.normalText || btn.textContent);
+    }
+
+    function renderInit(state) {
+      initState = state;
+      document.getElementById('activeCell').textContent = state.activeSheetName + '!' + state.activeA1;
+      const apiStatus = document.getElementById('apiStatus');
+      apiStatus.textContent = state.apiKeySaved ? 'APIキーは保存されています。' : 'APIキーが未設定です。';
+      apiStatus.className = 'status ' + (state.apiKeySaved ? 'ok' : 'warn');
+
+      if (state.styleProfileSummary) {
+        const s = state.styleProfileSummary;
+        const el = document.getElementById('styleSummary');
+        el.style.display = 'block';
+        el.textContent =
+          '文体名: ' + (s.style_name || '-') + '\n' +
+          '概要: ' + (s.summary || '-') + '\n' +
+          'B: ' + (s.B_sentence_structure || '-') + '\n' +
+          'D: ' + (s.D_overall_tone || '-') + '\n' +
+          '最終更新: ' + s.updatedAt;
+      }
+    }
+
+    function refreshInit() {
+      google.script.run.withSuccessHandler(renderInit).withFailureHandler(alert).getInitState();
+    }
+
+    document.getElementById('saveKeyBtn').addEventListener('click', function() {
+      const key = document.getElementById('apiKeyInput').value.trim();
+      const btn = this;
+      btn.dataset.normalText = 'APIキーを保存';
+      btn.dataset.busyText = '保存中...';
+      setBusy(btn, true);
+      google.script.run.withSuccessHandler(function() {
+        setBusy(btn, false);
+        document.getElementById('apiStatus').textContent = 'APIキーを保存しました。';
+        document.getElementById('apiStatus').className = 'status ok';
+      }).withFailureHandler(function(err) {
+        setBusy(btn, false);
+        alert(err.message || err);
+      }).saveApiKey(key);
+    });
+
+    document.getElementById('sampleBtn').addEventListener('click', function() {
+      const btn = this;
+      btn.dataset.normalText = '文体サンプル用シートを作成/表示';
+      btn.dataset.busyText = '開いています...';
+      setBusy(btn, true);
+      google.script.run.withSuccessHandler(function() {
+        setBusy(btn, false);
+        refreshInit();
+      }).withFailureHandler(function(err) {
+        setBusy(btn, false);
+        alert(err.message || err);
+      }).ensureSampleSheet();
+    });
+
+    document.getElementById('analyzeBtn').addEventListener('click', function() {
+      const btn = this;
+      btn.dataset.normalText = '私の文体を分析する';
+      btn.dataset.busyText = '分析中...';
+      setBusy(btn, true);
+      google.script.run.withSuccessHandler(function(summary) {
+        setBusy(btn, false);
+        const el = document.getElementById('styleSummary');
+        el.style.display = 'block';
+        el.textContent =
+          '文体名: ' + (summary.style_name || '-') + '\n' +
+          '概要: ' + (summary.summary || '-') + '\n' +
+          'B: ' + (summary.B_sentence_structure || '-') + '\n' +
+          'D: ' + (summary.D_overall_tone || '-') + '\n' +
+          '最終更新: ' + summary.updatedAt;
+        alert('文体プロファイルを保存しました。');
+      }).withFailureHandler(function(err) {
+        setBusy(btn, false);
+        alert(err.message || err);
+      }).analyzeMyStyle();
+    });
+
+    document.getElementById('genBtn').addEventListener('click', function() {
+      const memoText = document.getElementById('memoInput').value;
+      const goalCode = document.getElementById('goalSelect').value;
+      const btn = this;
+      btn.dataset.normalText = '所見を生成';
+      btn.dataset.busyText = '生成中...';
+      setBusy(btn, true);
+      document.getElementById('genResult').style.display = 'none';
+      document.getElementById('genWritten').style.display = 'none';
+
+      google.script.run.withSuccessHandler(function(res) {
+        setBusy(btn, false);
+        const out = document.getElementById('genResult');
+        out.textContent = res.text;
+        out.style.display = 'block';
+        const w = document.getElementById('genWritten');
+        w.textContent = 'シートへ出力しました → ' + res.writtenTo;
+        w.style.display = 'block';
+        refreshInit();
+      }).withFailureHandler(function(err) {
+        setBusy(btn, false);
+        alert(err.message || err);
+      }).generateRemark({ memoText, goalCode });
+    });
+
+    // 初期化
+    refreshInit();
+  </script>
+</body>
+</html>
