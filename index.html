@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>通知表所見アシストの使い方</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.8;
+      color: #333;
+      background-color: #f9f9f9;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background-color: #fff;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+    h1, h2, h3 {
+      border-bottom: 2px solid #74a2de;
+      padding-bottom: 10px;
+      margin-top: 40px;
+    }
+    h1 {
+      font-size: 28px;
+      text-align: center;
+      border-bottom: none;
+    }
+    h2 {
+      font-size: 22px;
+    }
+    h3 {
+      font-size: 18px;
+      border-bottom: 1px solid #ccc;
+    }
+    p, li {
+      font-size: 16px;
+    }
+    code {
+      background-color: #eee;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+    .step {
+      margin-top: 20px;
+      padding-left: 20px;
+      border-left: 3px solid #74a2de;
+      background-color: #f4f7fa;
+      padding: 20px;
+      border-radius: 5px;
+    }
+    .step-number {
+      font-weight: bold;
+      color: #74a2de;
+      font-size: 20px;
+    }
+    .hint {
+      background-color: #fffbe6;
+      border: 1px solid #ffe58f;
+      padding: 15px;
+      border-radius: 5px;
+      margin-top: 20px;
+    }
+    .hint::before {
+      content: "💡";
+      margin-right: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>通知表所見アシストの使い方</h1>
+    <p>このツールは、先生方が通知表の所見を書く作業をお手伝いするためのものです。いくつかのキーワードを入れるだけで、AIが自然な文章を作成してくれます。ICTが苦手な先生でも、簡単なステップで使えるように設計されていますので、ご安心ください。</p>
+
+    <h2>1. 最初の準備（初回のみ）</h2>
+    <p>初めて使うときだけ、以下の2つの準備が必要です。</p>
+
+    <div class="step">
+      <h3 id="apikey"><span class="step-number">ステップ1：</span> APIキーを取得して設定する</h3>
+      <p>AIを使うための「パスワード」のようなものである「APIキー」を取得します。</p>
+      <ol>
+        <li><a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio</a> にアクセスし、Googleアカウントでログインします。</li>
+        <li>「Create API key in new project」というボタンをクリックして、新しいキーを作成します。</li>
+        <li>作成されたキー（長い文字列）をコピーします。</li>
+        <li>スプレッドシートに戻り、メニューの「所見支援」→「サイドバーを開く」をクリックします。</li>
+        <li>サイドバー下部の「設定」にある入力欄に、コピーしたAPIキーを貼り付け、「APIキーを保存」ボタンを押します。</li>
+      </ol>
+      <p>これでAIと通信できるようになりました。</p>
+    </div>
+
+    <div class="step">
+      <h3 id="style"><span class="step-number">ステップ2：</span> 「私の文体」をAIに学習させる</h3>
+      <p>AIが先生の書き方に似た、自然な文章を作れるように、先生の文体を学習させます。</p>
+      <ol>
+        <li>スプレッドシートのメニューから「所見支援」→「文体サンプル用シートを作成/表示」を選びます。</li>
+        <li><code>文体サンプル</code> という名前のシートが作成されます。</li>
+        <li>A列に、<strong>過去に先生自身が作成した所見を10個〜20個ほど</strong>、1つのセルに1件ずつ貼り付けます。（個人名などのプライバシー情報は削除してください）</li>
+        <li>サイドバーにある「私の文体を分析する」ボタンをクリックします。</li>
+        <li>分析が終わると、<code>文体プロファイル</code> というシートが自動で作成されます。これでAIの学習は完了です。</li>
+      </ol>
+    </div>
+
+    <h2>2. 所見の作り方</h2>
+    <p>準備が終わったら、いつでも所見を作ることができます。</p>
+
+    <div class="step">
+      <h3 id="generate"><span class="step-number">ステップ1：</span> 箇条書きメモを入力する</h3>
+      <p>サイドバーの「箇条書きメモ」の欄に、所見に書きたい生徒の様子を、短い言葉で入力します。Enterキーで改行することで、複数項目を入力できます。</p>
+      <p><strong>例：</strong></p>
+      <ul>
+        <li>学習への姿勢が安定してきた</li>
+        <li>グループ活動で友達の話をよく聞ける</li>
+        <li>苦手な計算問題も、諦めずに取り組むようになった</li>
+      </ul>
+      <div class="hint">
+        <strong>便利なヒント：</strong> スプレッドシートのセルにメモが入力されている場合、そのセル（複数選択も可能）を選んでから、サイドバーの<strong>「選択セルの内容を取得」</strong>ボタンを押すと、メモ欄に内容を簡単に取り込めます。
+      </div>
+    </div>
+
+    <div class="step">
+      <h3 id="options"><span class="step-number">ステップ2：</span> ゴールや文字数を設定する</h3>
+      <ul>
+        <li><strong>ゴール：</strong> 作成する文章の目的（生徒の成長を伝えたい、保護者を安心させたいなど）を選びます。</li>
+        <li><strong>およその文字数：</strong> 作成したい文章の長さを指定します。</li>
+        <li><strong>対象学年：</strong> 文章の言葉遣いを調整するために、対象の学年を選びます。</li>
+      </ul>
+    </div>
+
+    <div class="step">
+      <h3 id="write"><span class="step-number">ステップ3：</span> 所見を生成して書き出す</h3>
+      <ol>
+        <li>所見を書き出したいセルを、スプレッドシート上でクリックして選択します。</li>
+        <li>サイドバーの「所見を生成」ボタンを押します。</li>
+        <li>少し待つと、AIが作成した文章が、選択していたセルに自動で入力されます。</li>
+      </ol>
+      <p>あとは、必要に応じて手直しをすれば完成です！</p>
+    </div>
+
+  </div>
+</body>
+</html>
