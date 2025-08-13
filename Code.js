@@ -48,6 +48,22 @@ function getInitState() {
   };
 }
 
+function getSelectedCellContent() {
+  const rangeList = SpreadsheetApp.getActiveRangeList();
+  if (rangeList) {
+    const allValues = [];
+    const ranges = rangeList.getRanges();
+    for (let i = 0; i < ranges.length; i++) {
+      const values = ranges[i].getValues();
+      allValues.push(...values);
+    }
+    // Flatten the 2D array, filter out empty cells, and join with newlines.
+    const content = allValues.flat().filter(cell => cell.toString().trim() !== '').join('\n');
+    return content;
+  }
+  return '';
+}
+
 function saveApiKey(key) {
   const trimmed = (key || '').trim();
   if (!trimmed) throw new Error('APIキーが空です。');
@@ -164,9 +180,24 @@ function analyzeMyStyle() {
   
   writeProfileToSheet_(profile);
 
+  // 新しいシートを作成してヘッダーを設定
+  if (profile.parameters && profile.parameters.length > 0) {
+    const ss = SpreadsheetApp.getActive();
+    const sheetName = '所見作成';
+    let sh = ss.getSheetByName(sheetName);
+    if (!sh) {
+      sh = ss.insertSheet(sheetName);
+    }
+    sh.clear();
+    const headers = profile.parameters.concat(['箇条書きメモ', '生成された所見']);
+    sh.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
+    sh.setFrozenRows(1);
+    SpreadsheetApp.getUi().alert('文体分析が完了し、「' + SHEET_PROFILE + '」シートを更新しました。さらに、所見作成用の「' + sheetName + '」シートを準備しました。');
+  } else {
+    SpreadsheetApp.getUi().alert('文体分析が完了し、結果を「' + SHEET_PROFILE + '」シートに書き出しました。内容は直接編集可能です。');
+  }
+
   PropertiesService.getUserProperties().setProperty(PROP_STYLE_PROFILE, JSON.stringify(profile));
-  
-  SpreadsheetApp.getUi().alert('文体分析が完了し、結果を「' + SHEET_PROFILE + '」シートに書き出しました。内容は直接編集可能です。');
 
   return summarizeStyleProfile_(profile);
 }
@@ -222,24 +253,24 @@ function generateRemark(input) {
 // Gemini呼び出し：文体分析（responseMimeType を削除）
 function analyzeStyleWithGemini_(samples) {
   const joined = samples.map(function(s, i){ return '【サンプル' + (i + 1) + '】\n' + s; }).join('\n\n');
-  const instruction = [
-    'あなたは日本語の文章スタイルを分析する専門家です。',
-    '以下は、ある教員が過去に作成した通知表所見文のサンプルです。',
-    '特に次の観点を明確に抽出してください:',
-    'B：文の構成（一文の長さ、接続詞の使い方、段落の組み立て）',
-    'D：全体的なトーン（丁寧さ、温かみ、客観性、励ましの度合い など）',
-    '必ず次のJSONスキーマの1オブジェクトのみを返すこと。前置きやコードブロックは不要。',
-    '{',
-    '  "style_name": string,',
-    '  "summary": string,',
-    '  "B_sentence_structure": string,',
-    '  "D_overall_tone": string,',
-    '  "dos": string[],',
-    '  "donts": string[],',
-    '  "phrase_bank": string[],',
-    '  "closing_patterns": string[]',
-    '}'
-  ].join('\n');
+  const instruction = `あなたは日本語の文章スタイルを分析する専門家です。
+以下は、ある教員が過去に作成した通知表所見文のサンプルです。
+特に次の観点を明確に抽出してください:
+B：文の構成（一文の長さ、接続詞の使い方、段落の組み立て）
+D：全体的なトーン（丁寧さ、温かみ、客観性、励ましの度合い など）
+抽出した観点に加えて、所見の文脈で重要となるパラメーター（例：教科、単元、評価観点など）を抽出し、"parameters"としてキーの配列で返してください。
+必ず次のJSONスキーマの1オブジェクトのみを返すこと。前置きやコードブロックは不要。
+{
+  "style_name": "string",
+  "summary": "string",
+  "B_sentence_structure": "string",
+  "D_overall_tone": "string",
+  "dos": ["string"],
+  "donts": ["string"],
+  "phrase_bank": ["string"],
+  "closing_patterns": ["string"],
+  "parameters": ["string"]
+}`;
 
   const body = {
     contents: [
@@ -432,7 +463,7 @@ function formatStyleGuidance_(profile) {
 }
 
 function postProcess_(text) {
-  var t = text.replace(/^["'「」]+|["'「」]+$/g, '').trim();
+  var t = text.replace(/^[\"'「」]+|[\"'「」]+$/g, '').trim();
   var parts = t.split(/\n{2,}/);
   if (parts.length > 2) t = parts.slice(0, 2).join('\n\n');
   return t;

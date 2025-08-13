@@ -28,7 +28,10 @@
     </div>
     <div class="row">
       <label>箇条書きメモ（個人が特定されない一般的な内容のみ。1行=1項目）</label>
-      <textarea id="memoInput" placeholder="- 学習への姿勢が安定\n- グループ活動で傾聴ができる\n- 苦手単元は計算の見直しに改善の余地 など"></textarea>
+      <button id="importCellBtn" style="float: right; margin-bottom: 4px;">選択セルの内容を取得</button>
+      <textarea id="memoInput" placeholder="- 学習への姿勢が安定
+- グループ活動で傾聴ができる
+- 苦手単元は計算の見直しに改善の余地 など" style="width: 100%;"></textarea>
       <div class="hint">具体的な氏名・大会名・学校名・日付などは書かないでください。</div>
     </div>
     <div class="row">
@@ -239,6 +242,25 @@
         setBusy(btn, false);
         alert(err.message || err);
       }).loadProfileFromSheet();
+    });
+
+    document.getElementById('importCellBtn').addEventListener('click', function() {
+      const btn = this;
+      btn.dataset.normalText = '選択セルの内容を取得';
+      btn.dataset.busyText = '取得中...';
+      setBusy(btn, true);
+      google.script.run.withSuccessHandler(function(cellContent) {
+        setBusy(btn, false);
+        const memoInput = document.getElementById('memoInput');
+        if (memoInput.value.trim() && cellContent) {
+          memoInput.value += '\n' + cellContent;
+        } else if (cellContent) {
+          memoInput.value = cellContent;
+        }
+      }).withFailureHandler(function(err) {
+        setBusy(btn, false);
+        alert(err.message || err);
+      }).getSelectedCellContent();
     });
 
     document.getElementById('genBtn').addEventListener('click', function() {
