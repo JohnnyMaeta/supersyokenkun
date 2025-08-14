@@ -20,6 +20,8 @@ function onOpen() {
     .addItem('文体プロファイルを再読込', 'loadProfileFromSheet')
     .addSeparator()
     .addItem('APIキー設定', 'showSidebar')
+    .addSeparator()
+    .addItem('シートを配布用に初期化', 'initializeSheet')
     .addToUi();
 }
 
@@ -467,4 +469,61 @@ function postProcess_(text) {
   var parts = t.split(/\n{2,}/);
   if (parts.length > 2) t = parts.slice(0, 2).join('\n\n');
   return t;
+}
+
+/**
+ * 配布用にシートを初期化する
+ */
+function initializeSheet() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.alert(
+    'シートの初期化',
+    '本当にこのスプレッドシートを初期状態に戻しますか？\n' +
+    '「文体プロファイル」「所見作成」シートが削除され、' +
+    '「文体サンプル」シートの入力データと、保存されたAPIキーが消去されます。\n' +
+    'この操作は元に戻せません。',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (response !== ui.Button.OK) {
+    return;
+  }
+
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // 1. Delete specific sheets
+    const sheetsToDelete = [SHEET_PROFILE, '所見作成'];
+    sheetsToDelete.forEach(sheetName => {
+      const sheet = ss.getSheetByName(sheetName);
+      if (sheet) {
+        ss.deleteSheet(sheet);
+      }
+    });
+
+    // 2. Clear content of the sample sheet (keep header)
+    const sampleSheet = ss.getSheetByName(SHEET_SAMPLES);
+    if (sampleSheet) {
+      const lastRow = sampleSheet.getLastRow();
+      if (lastRow > 1) {
+        sampleSheet.getRange(2, 1, lastRow - 1, sampleSheet.getLastColumn()).clearContent();
+      }
+    }
+
+    // 3. Delete user properties
+    const userProps = PropertiesService.getUserProperties();
+    userProps.deleteProperty(PROP_API_KEY);
+    userProps.deleteProperty(PROP_STYLE_PROFILE);
+
+    // 4. Delete script properties as well, just in case
+    const scriptProps = PropertiesService.getScriptProperties();
+    scriptProps.deleteProperty(PROP_API_KEY);
+
+
+    ui.alert('初期化が完了しました。このスプレッドシートのコピーを配布できます。');
+
+  } catch (e) {
+    Logger.log('Initialization error: ' + e.toString());
+    ui.alert('エラーが発生しました。初期化を完了できませんでした。');
+  }
 }

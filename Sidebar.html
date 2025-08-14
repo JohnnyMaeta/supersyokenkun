@@ -99,6 +99,11 @@
       <button id="deleteKeyBtn" style="margin-left: 8px;">削除</button>
       <span id="apiStatus" class="status"></span>
     </div>
+    <hr style="margin-top: 20px; border-top: 1px solid #eee; border-bottom: none;">
+    <div class="row">
+        <button id="initializeBtn" style="background-color: #d9534f; color: white; border: none;">配布用に初期化する</button>
+        <div class="hint" style="margin-top: 8px;">APIキー、文体プロファイル、サンプル、作成シートなど、すべての個人設定を削除します。</div>
+    </div>
   </div>
 
   <script>
@@ -289,6 +294,29 @@
         setBusy(btn, false);
         alert(err.message || err);
       }).generateRemark({ memoText, goalCode, charCount, gradeLevel });
+    });
+
+    document.getElementById('initializeBtn').addEventListener('click', function() {
+      const confirmed = confirm('本当にこのスプレッドシートを初期化しますか？\n保存されたAPIキーや文体設定、サンプルシートの内容などがすべて削除されます。\nこの操作は元に戻せません。');
+      if (!confirmed) {
+        return;
+      }
+
+      const btn = this;
+      btn.dataset.normalText = '配布用に初期化する';
+      btn.dataset.busyText = '初期化中...';
+      setBusy(btn, true);
+      google.script.run.withSuccessHandler(function() {
+        setBusy(btn, false);
+        document.getElementById('apiKeyInput').value = '';
+        document.getElementById('styleSummary').style.display = 'none';
+        document.getElementById('memoInput').value = '';
+        alert('初期化が完了しました。');
+        refreshInit(); 
+      }).withFailureHandler(function(err) {
+        setBusy(btn, false);
+        alert('初期化中にエラーが発生しました：' + (err.message || err));
+      }).initializeSheet();
     });
 
     // 初期化
