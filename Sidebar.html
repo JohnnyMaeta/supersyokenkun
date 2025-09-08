@@ -115,6 +115,21 @@
       btn.textContent = busy ? (btn.dataset.busyText || '処理中...') : (btn.dataset.normalText || btn.textContent);
     }
 
+    function renderStyleSummary(summary) {
+      const el = document.getElementById('styleSummary');
+      if (!summary) {
+        el.style.display = 'none';
+        return;
+      }
+      el.style.display = 'block';
+      el.textContent =
+        '文体名: ' + (summary.style_name || '-') + '\n' +
+        '概要: ' + (summary.summary || '-') + '\n' +
+        'B: ' + (summary.B_sentence_structure || '-') + '\n' +
+        'D: ' + (summary.D_overall_tone || '-') + '\n' +
+        '最終更新: ' + summary.updatedAt;
+    }
+
     function renderInit(state) {
       initState = state;
       document.getElementById('activeCell').textContent = state.activeSheetName + '!' + state.activeA1;
@@ -133,6 +148,7 @@
           'D: ' + (s.D_overall_tone || '-') + '\n' +
           '最終更新: ' + s.updatedAt;
       }
+      renderStyleSummary(state.styleProfileSummary);
     }
 
     function refreshInit() {
@@ -207,6 +223,7 @@
           'D: ' + (summary.D_overall_tone || '-') + '\n' +
           '最終更新: ' + summary.updatedAt;
         // The alert is now handled in the backend
+        renderStyleSummary(summary);
       }).withFailureHandler(function(err) {
         setBusy(btn, false);
         alert(err.message || err);
@@ -241,6 +258,7 @@
           'B: ' + (summary.B_sentence_structure || '-') + '\n' +
           'D: ' + (summary.D_overall_tone || '-') + '\n' +
           '最終更新: ' + summary.updatedAt;
+        renderStyleSummary(summary);
         alert('シートから文体プロファイルを再読込し、保存しました。');
         refreshInit();
       }).withFailureHandler(function(err) {
