@@ -1,149 +1,384 @@
----
----
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>通知表所見アシストの使い方</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>通知表所見アシスト 使い方ガイド（最新版）</title>
   <style>
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      line-height: 1.8;
-      color: #333;
-      background-color: #f9f9f9;
+      font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans JP","Yu Gothic UI","YuGothic",Meiryo,sans-serif;
+      background: #f7f9fc;
+      color: #2f2f33;
       margin: 0;
-      padding: 20px;
+      padding: 0;
+      line-height: 1.8;
     }
     .container {
-      max-width: 800px;
+      max-width: 950px;
       margin: 0 auto;
-      background-color: #fff;
-      padding: 30px;
-      border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      padding: 32px 16px;
     }
-    h1, h2, h3 {
-      border-bottom: 2px solid #74a2de;
-      padding-bottom: 10px;
-      margin-top: 40px;
+    .card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      box-shadow: 0 2px 12px rgba(25,37,80,.045);
+      padding: 36px;
+      margin-bottom: 24px;
     }
     h1 {
-      font-size: 28px;
+      margin: 0 0 10px 0;
+      color: #2563eb;
+      font-size: 32px;
       text-align: center;
-      border-bottom: none;
+      letter-spacing: 1px;
+    }
+    .subtitle {
+      text-align: center;
+      color: #6b7280;
+      font-size: 18px;
+      margin-bottom: 24px;
     }
     h2 {
-      font-size: 22px;
+      font-size: 24px;
+      color: #2f72d6;
+      margin: 48px 0 10px;
+      border-left: 5px solid #2563eb;
+      padding-left: 10px;
     }
     h3 {
+      font-size: 19px;
+      margin: 30px 0 10px;
+      color: #2563eb;
+    }
+    h4 {
+      font-size: 17px;
+      margin: 25px 0 8px;
+      color: #374151;
+    }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 18px;
+      margin: 30px 0 36px;
+    }
+    .feature-card {
+      background: #f4f7fa;
+      border: 1px solid #e5e7eb;
+      border-radius: 9px;
+      padding: 22px 16px;
+      text-align: center;
+    }
+    .feature-icon {
+      font-size: 36px;
+      margin-bottom: 7px;
+      display: block;
+    }
+    .toc {
+      background: #f4f7fa;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 20px 32px;
+      margin: 36px 0;
+    }
+    .toc h3 {
+      margin-top: 0;
+      color: #495057;
       font-size: 18px;
-      border-bottom: 1px solid #ccc;
     }
-    p, li {
-      font-size: 16px;
+    .toc ul {
+      list-style: none;
+      padding-left: 0;
+      margin-bottom: 0;
     }
-    code {
-      background-color: #eee;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-family: monospace;
+    .toc li {
+      margin-bottom: 7px;
     }
+    .toc a {
+      color: #2563eb;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .toc a:hover {
+      text-decoration: underline;
+    }
+    ol, ul {
+      padding-left: 28px;
+    }
+    li { margin-bottom: 7px; }
     .step {
-      margin-top: 20px;
-      padding-left: 20px;
-      border-left: 3px solid #74a2de;
-      background-color: #f4f7fa;
-      padding: 20px;
-      border-radius: 5px;
+      background: #f8fafe;
+      border-left: 5px solid #2563eb;
+      padding: 22px 28px;
+      margin: 25px 0;
+      border-radius: 0 12px 12px 0;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.035);
     }
     .step-number {
+      display: inline-block;
+      background: #2563eb;
+      color: #fff;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 30px;
       font-weight: bold;
-      color: #74a2de;
-      font-size: 20px;
+      margin-right: 12px;
+      font-size: 16px;
+      vertical-align: middle;
     }
-    .hint {
-      background-color: #fffbe6;
+    .step-title {
+      display: inline-block;
+      font-size: 19px;
+      font-weight: bold;
+      color: #2c3e50;
+      vertical-align: middle;
+      margin-top: 2px;
+    }
+    .highlight {
+      background: #fffbe6;
       border: 1px solid #ffe58f;
-      padding: 15px;
-      border-radius: 5px;
-      margin-top: 20px;
+      padding: 14px 20px;
+      border-radius: 9px;
+      margin: 18px 0;
     }
-    .hint::before {
-      content: "💡";
-      margin-right: 10px;
+    .highlight::before { content: "💡"; margin-right: 10px; font-size: 18px; }
+    .warn {
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      color: #b45309;
+      padding: 16px 20px;
+      border-radius: 9px;
+      margin: 18px 0;
+    }
+    .warn::before { content: "⚠️"; margin-right: 10px; font-size: 18px; }
+    .success {
+      background: #e8f5e9;
+      border: 1px solid #b8e2c5;
+      color: #237d3e;
+      padding: 14px 18px;
+      border-radius: 9px;
+      margin: 18px 0;
+    }
+    .success::before { content: "✅"; margin-right: 10px; font-size: 18px; }
+    code {
+      background: #f3f4f6;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-family: ui-monospace,monospace;
+      font-size: 15px;
+      color: #e83e8c;
+    }
+    .example {
+      background: #e8f5e9;
+      border-left: 5px solid #28a745;
+      padding: 13px 20px;
+      margin: 14px 0;
+    }
+    .example-title {
+      font-weight: bold;
+      color: #237d3e;
+      margin-bottom: 8px;
+    }
+    .note {
+      font-size: 14px;
+      color: #6b7280;
+      margin: 10px 0;
+    }
+    .button-link {
+      display: inline-block;
+      background: #2563eb;
+      color: #fff;
+      padding: 9px 18px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: bold;
+      margin: 7px 0;
+      transition: background .2s;
+    }
+    .button-link:hover { background: #1746a2; }
+    .pill {
+      background:#eef2ff;color:#3730a3;border-radius:8px;padding:2px 8px;font-size:12px;margin-left:6px;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>通知表所見アシストの使い方</h1>
-    <p>このツールは、先生方が通知表の所見を書く作業をお手伝いするためのものです。いくつかのキーワードを入れるだけで、AIが自然な文章を作成してくれます。ICTが苦手な先生でも、簡単なステップで使えるように設計されていますので、ご安心ください。</p>
+    <div class="card">
+      <h1>通知表所見アシスト 使い方ガイド</h1>
+      <div class="subtitle">あなたの文体プロファイルを反映し、指定文字数の±10%で自然な所見を自動生成します。</div>
 
-    <h2>1. 最初の準備（初回のみ）</h2>
-    <p>初めて使うときだけ、以下の2つの準備が必要です。</p>
+      <div class="toc">
+        <h3>📋 目次</h3>
+        <ul>
+          <li><a href="#features">主要機能</a></li>
+          <li><a href="#setup">初期設定・導入方法</a></li>
+          <li><a href="#sample">文体サンプル準備と分析</a></li>
+          <li><a href="#generation">所見生成フロー</a></li>
+          <li><a href="#advanced">上級機能・カスタマイズ</a></li>
+          <li><a href="#trouble">トラブルシューティング・FAQ</a></li>
+          <li><a href="#tips">効果的な使い方のコツ</a></li>
+          <li><a href="#support">サポート・バージョン情報</a></li>
+        </ul>
+      </div>
 
-    <div class="step">
-      <h3 id="apikey"><span class="step-number">ステップ1：</span> APIキーを取得して設定する</h3>
-      <p>AIを使うための「パスワード」のようなものである「APIキー」を取得します。</p>
-      <ol>
-        <li><a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio</a> にアクセスし、Googleアカウントでログインします。</li>
-        <li>「Create API key in new project」というボタンをクリックして、新しいキーを作成します。</li>
-        <li>作成されたキー（長い文字列）をコピーします。</li>
-        <li>スプレッドシートに戻り、メニューの「所見支援」→「サイドバーを開く」をクリックします。</li>
-        <li>サイドバー下部の「設定」にある入力欄に、コピーしたAPIキーを貼り付け、「APIキーを保存」ボタンを押します。</li>
-      </ol>
-      <p>これでAIと通信できるようになりました。</p>
-    </div>
+      <h2 id="features">主要機能</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <span class="feature-icon">🎨</span>
+          <h4>文体プロファイル学習</h4>
+          <p>あなたの過去の所見を分析し、構成・トーン・語彙・文末表現・視点などを自動で学習・反映。</p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">📏</span>
+          <h4>精密な文字数制御</h4>
+          <p>指定文字数の±10%範囲で必ず出力。4段階の自動調整でほぼ範囲外になりません。</p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">🛡️</span>
+          <h4>プライバシー保護</h4>
+          <p>個人名や連絡先は自動で匿名化。角括弧プレースホルダ混入も防止します。</p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">🎯</span>
+          <h4>目的別生成</h4>
+          <p>成長過程・保護者安心・行動提案など、目的に応じて構成やトーンも最適化。</p>
+        </div>
+      </div>
 
-    <div class="step">
-      <h3 id="style"><span class="step-number">ステップ2：</span> 「私の文体」をAIに学習させる</h3>
-      <p>AIが先生の書き方に似た、自然な文章を作れるように、先生の文体を学習させます。</p>
-      <ol>
-        <li>スプレッドシートのメニューから「所見支援」→「文体サンプル用シートを作成/表示」を選びます。</li>
-        <li><code>文体サンプル</code> という名前のシートが作成されます。</li>
-        <li>A列に、<strong>過去に先生自身が作成した所見を10個〜20個ほど</strong>、1つのセルに1件ずつ貼り付けます。（個人名などのプライバシー情報は削除してください）</li>
-        <li>サイドバーにある「私の文体を分析する」ボタンをクリックします。</li>
-        <li>分析が終わると、<code>文体プロファイル</code> というシートが自動で作成されます。これでAIの学習は完了です。</li>
-      </ol>
-    </div>
+      <h2 id="setup">初期設定・導入方法</h2>
+      <div class="step">
+        <span class="step-number">1</span>
+        <span class="step-title">Gemini APIキーの取得と設定</span>
+        <ol>
+          <li><a href="https://aistudio.google.com/app/apikey" target="_blank" class="button-link">Google AI Studio</a> にアクセス</li>
+          <li>Googleアカウントでログインし「Create API key in new project」をクリック</li>
+          <li>生成されたAPIキー（長い文字列）をコピー</li>
+          <li>スプレッドシートで「所見支援」→「サイドバーを開く」</li>
+          <li>サイドバー下部「設定」欄にAPIキーを貼り付けて「APIキーを保存」</li>
+        </ol>
+        <div class="success">APIキーが正しく保存されると「保存済み」と表示されます。</div>
+      </div>
+      <div class="step">
+        <span class="step-number">2</span>
+        <span class="step-title">Apps Scriptでの導入（新規の場合のみ）</span>
+        <ol>
+          <li>Googleスプレッドシートを開き、<b>拡張機能→Apps Script</b>を選択</li>
+          <li>エディタで<code>Code.gs</code>ファイルを作成し、提供されたコードを貼り付ける</li>
+          <li>左側の「＋」から<code>Sidebar.html</code>や<code>index.html</code>を追加し、それぞれのコードを貼り付け</li>
+          <li>保存してスプレッドシートに戻ると、メニューに「所見支援」が表示されます</li>
+        </ol>
+        <div class="highlight">Apps Scriptの権限認証は初回のみ必要です。</div>
+      </div>
 
-    <h2>2. 所見の作り方</h2>
-    <p>準備が終わったら、いつでも所見を作ることができます。</p>
+      <h2 id="sample">文体サンプル準備と分析</h2>
+      <div class="step">
+        <span class="step-number">3</span>
+        <span class="step-title">文体サンプルの用意・分析</span>
+        <ol>
+          <li>「所見支援」→「文体サンプル用シートを作成/表示」をクリック</li>
+          <li><code>文体サンプル</code>シートA列に、過去の所見を10〜20件（1セル1件）貼付</li>
+          <li>できるだけ複数の場面・学年・教科を含める</li>
+          <li>個人名などは必ず事前に匿名化</li>
+          <li>サイドバーの「私の文体を分析する」ボタンを押す</li>
+          <li>分析後、「文体プロファイル」シートが自動作成されます</li>
+        </ol>
+        <div class="highlight">プロファイルは「文体プロファイルを再読込」で随時編集＆反映可能です。</div>
+      </div>
 
-    <div class="step">
-      <h3 id="generate"><span class="step-number">ステップ1：</span> 箇条書きメモを入力する</h3>
-      <p>サイドバーの「箇条書きメモ」の欄に、所見に書きたい生徒の様子を、短い言葉で入力します。Enterキーで改行することで、複数項目を入力できます。</p>
-      <p><strong>例：</strong></p>
+      <h2 id="generation">所見生成フロー</h2>
+      <div class="step">
+        <span class="step-number">4</span>
+        <span class="step-title">所見生成の手順</span>
+        <ol>
+          <li>サイドバーの「箇条書きメモ」欄に、生徒の様子・特徴・努力などを一行ずつ入力
+            <div class="example"><div class="example-title">例：</div>
+              ・算数の計算問題に積極的に取り組んでいる<br>
+              ・友達と協力してグループ活動を進められる<br>
+              ・苦手な漢字練習も諦めずに続けている
+            </div>
+          </li>
+          <li>ゴール（目的）、文字数、対象学年を設定</li>
+          <li>出力先セルをスプレッドシート上で選択</li>
+          <li>サイドバーの「所見を生成」ボタンをクリック</li>
+          <li>AIがあなたの文体プロファイルを反映し、<b>指定文字数±10%</b>範囲で自然な所見文を自動生成→セルに出力されます</li>
+        </ol>
+        <div class="highlight">
+          <b>文字数制御:</b> 例：200字指定なら180〜220字内で必ず出力されます<br>
+          <b>文体プロファイル:</b> 分析し直す・編集後に「再読込」を押すと即反映されます
+        </div>
+      </div>
+
+      <h2 id="advanced">上級機能・カスタマイズ</h2>
+      <div class="step">
+        <span class="step-number">5</span>
+        <span class="step-title">文体プロファイル編集・再読込</span>
+        <ol>
+          <li>「所見支援」→「文体プロファイルを表示・編集」でシートを開く</li>
+          <li>dos/donts/phrase_bank/closing_patternsなどを直接編集</li>
+          <li>編集後は「文体プロファイルを再読込」で生成に即時反映されます</li>
+        </ol>
+      </div>
+      <div class="step">
+        <span class="step-number">6</span>
+        <span class="step-title">4段階生成技術</span>
+        <ul>
+          <li><b>段階1:</b> 文体プロファイル反映で複数回生成</li>
+          <li><b>段階2:</b> 範囲内結果を優先採用</li>
+          <li><b>段階3:</b> AIによる再調整</li>
+          <li><b>段階4:</b> 物理的な文字数調整</li>
+        </ul>
+        <div class="note">ほぼ100%で指定範囲内＆文体反映した所見が得られます。</div>
+      </div>
+      <div class="step">
+        <span class="step-number">7</span>
+        <span class="step-title">配布・共有時の初期化</span>
+        <ol>
+          <li>「所見支援」→「シートを配布用に初期化」を実行</li>
+          <li>APIキー・プロファイル・サンプルデータが消去されます</li>
+          <li>各ユーザーが自分の設定・サンプルを入れて利用開始できます</li>
+        </ol>
+        <div class="warn">
+          <b>注意:</b> 配布前に必ず「初期化」を実行し、個人情報やプロファイルが残らないようご注意ください
+        </div>
+      </div>
+
+      <h2 id="trouble">トラブルシューティング・FAQ</h2>
+      <h3>よくあるエラーと対処法</h3>
       <ul>
-        <li>学習への姿勢が安定してきた</li>
-        <li>グループ活動で友達の話をよく聞ける</li>
-        <li>苦手な計算問題も、諦めずに取り組むようになった</li>
+        <li><b>APIキーが未設定</b> → サイドバーの「設定」で保存してください</li>
+        <li><b>出力がブロックされました</b> → メモ表現を一般化、個人情報/センシティブな内容を避ける</li>
+        <li><b>出力先セルが未選択</b> → 生成前にセルをクリックしてください</li>
+        <li><b>文体プロファイルが反映されない</b> → 「文体プロファイルを再読込」を押してください</li>
+        <li><b>文字数が範囲外</b> → メモを少し詳しく/簡潔に、または目標文字数を調整</li>
+        <li><b>連続エラー/レート制限</b> → 時間をおいて再試行してください</li>
       </ul>
-      <div class="hint">
-        <strong>便利なヒント：</strong> スプレッドシートのセルにメモが入力されている場合、そのセル（複数選択も可能）を選んでから、サイドバーの<strong>「選択セルの内容を取得」</strong>ボタンを押すと、メモ欄に内容を簡単に取り込めます。
+      <h3>FAQ</h3>
+      <ul>
+        <li><b>Q:</b> 文字数はぴったりですか？<br><b>A:</b> ±10%範囲に必ず収まるよう4段階で調整します。厳密な「ぴったり」は保証しません。</li>
+        <li><b>Q:</b> 文体プロファイルはどこで反映されますか？<br><b>A:</b> 生成・再調整・最終調整のすべてで反映されます。編集後は「再読込」を押してください。</li>
+        <li><b>Q:</b> 複数の所見を一括生成できますか？<br><b>A:</b> シート上で複数行にメモを用意し、1行ずつ生成できます。</li>
+        <li><b>Q:</b> AIが学年によって言葉を変えますか？<br><b>A:</b> 低学年ほどやさしい語彙、上級生ほど論理的・抽象的な表現に自動調整されます。</li>
+      </ul>
+
+      <h2 id="tips">効果的な使い方のコツ</h2>
+      <ul>
+        <li><b>サンプル文は多様に:</b> 学年・シーン・教科ごとに10件以上</li>
+        <li><b>メモは具体的かつ短く:</b> 行動＋背景＋変化＋今後 で分けて書く</li>
+        <li><b>個人情報は必ず匿名化:</b> [人物] などで置換、または削除</li>
+        <li><b>プロファイルを定期的に更新:</b> 追加サンプルで時々分析し直すと精度UP</li>
+        <li><b>目的別活用:</b> 目的ごとにゴール設定やメモ内容を調整</li>
+      </ul>
+
+      <h2 id="support">サポート・バージョン情報</h2>
+      <div class="success">
+        <b>このツールは <span style="color:#2563eb;">Gemini 2.0 Flash</span> を利用し、先生方の業務効率化を強力に支援します。</b><br>
+        技術的な問題が発生時は APIキーの再設定やサンプル見直しをお試しください。<br>
+        <span class="note">バージョン: 2024年9月 文体プロファイル反映強化版 / 文字数制約±10%対応</span>
       </div>
     </div>
-
-    <div class="step">
-      <h3 id="options"><span class="step-number">ステップ2：</span> ゴールや文字数を設定する</h3>
-      <ul>
-        <li><strong>ゴール：</strong> 作成する文章の目的（生徒の成長を伝えたい、保護者を安心させたいなど）を選びます。</li>
-        <li><strong>およその文字数：</strong> 作成したい文章の長さを指定します。</li>
-        <li><strong>対象学年：</strong> 文章の言葉遣いを調整するために、対象の学年を選びます。</li>
-      </ul>
-    </div>
-
-    <div class="step">
-      <h3 id="write"><span class="step-number">ステップ3：</span> 所見を生成して書き出す</h3>
-      <ol>
-        <li>所見を書き出したいセルを、スプレッドシート上でクリックして選択します。</li>
-        <li>サイドバーの「所見を生成」ボタンを押します。</li>
-        <li>少し待つと、AIが作成した文章が、選択していたセルに自動で入力されます。</li>
-      </ol>
-      <p>あとは、必要に応じて手直しをすれば完成です！</p>
-    </div>
-
   </div>
 </body>
 </html>
