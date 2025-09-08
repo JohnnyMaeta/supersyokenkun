@@ -256,12 +256,8 @@
       setBusy(btn, true);
       google.script.run.withSuccessHandler(function(cellContent) {
         setBusy(btn, false);
-        const memoInput = document.getElementById('memoInput');
-        if (memoInput.value.trim() && cellContent) {
-          memoInput.value += '\n' + cellContent;
-        } else if (cellContent) {
-          memoInput.value = cellContent;
-        }
+        // 常にテキストエリアの内容を新しい内容で上書き（クリアしてからセット）する
+        document.getElementById('memoInput').value = cellContent || '';
       }).withFailureHandler(function(err) {
         setBusy(btn, false);
         alert(err.message || err);

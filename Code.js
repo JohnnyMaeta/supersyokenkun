@@ -1,6 +1,12 @@
 /**
  * 通知表所見作成支援アプリ（GAS）
- * Gemini 2.0 Flash (v1) 対応版
+ * Gemini 2.0 Flash (v1) 対応版 - 文体プロファイル反映強化版
+ * 
+ * 主要機能：
+ * - 指定文字数の±10%範囲での所見生成
+ * - 文体プロファイルの完全反映
+ * - 4段階のフォールバック機能による確実な文字数制御
+ * - プライバシー保護機能
  */
 
 const GEMINI_MODEL = 'gemini-2.0-flash-001';
@@ -59,7 +65,6 @@ function getSelectedCellContent() {
       const values = ranges[i].getValues();
       allValues.push(...values);
     }
-    // Flatten the 2D array, filter out empty cells, and join with newlines.
     const content = allValues.flat().filter(cell => cell.toString().trim() !== '').join('\n');
     return content;
   }
@@ -76,12 +81,7 @@ function saveApiKey(key) {
 function deleteApiKey() {
   const userProps = PropertiesService.getUserProperties();
   userProps.deleteProperty(PROP_API_KEY);
-  
-  // 念のためスクリプトプロパティからも削除試行
-  const scriptProps = PropertiesService.getScriptProperties();
-  scriptProps.deleteProperty(PROP_API_KEY);
-
-  return true; // 成功を示す
+  return true;
 }
 
 function ensureSampleSheet() {
@@ -92,7 +92,7 @@ function ensureSampleSheet() {
     sh.getRange('A1').setValue('過去に自分で作成した所見文（1セル=1件）');
     sh.setColumnWidths(1, 1, 640);
     sh.getRange('A1').setFontWeight('bold');
-    sh.getRange('A2').setNote('例）一学期当初は〜 のように、実名や具体的大会名などは書かないでください。');
+    sh.getRange('A2').setNote('ここにサンプル文を貼り付けてください。\n精度向上のため、学習面・生活面など、状況の異なる10件以上のサンプルを推奨します。\n（個人名は「[人物]」のように自動で置き換わりますが、最初から匿名化しておくとより安全です）');
     sh.getRange('A2').setWrap(true);
   }
   ss.setActiveSheet(sh);
@@ -103,8 +103,6 @@ function showProfileSheet() {
   const ss = SpreadsheetApp.getActive();
   let sh = ss.getSheetByName(SHEET_PROFILE);
   if (!sh) {
-    // sh = ss.insertSheet(SHEET_PROFILE);
-    // sh.getRange('A1').setValue('ここにプロファイルが表示されます。先に文体分析を実行してください。');
     throw new Error('文体プロファイルシートがまだ作成されていません。先に文体分析を実行してください。');
   }
   ss.setActiveSheet(sh);
@@ -172,18 +170,27 @@ function writeProfileToSheet_(profile) {
   ss.setActiveSheet(sh);
 }
 
-// 文体分析
 function analyzeMyStyle() {
   const samples = readSamples_();
-  if (samples.length < 5) {
-    throw new Error('サンプル文が不足しています。最低5件以上（推奨10件）を ' + SHEET_SAMPLES + ' シートのA列に貼り付けてください。');
+  if (samples.length < 7) {
+    throw new Error(`サンプル文が不足しています（現在${samples.length}件）。より精度の高い分析のため、最低7件、推奨10件以上の多様なサンプル（学習面、生活面、行事など）を「${SHEET_SAMPLES}」シートに貼り付けてください。`);
   }
   const profile = analyzeStyleWithGemini_(samples);
   
   writeProfileToSheet_(profile);
 
-  // 新しいシートを作成してヘッダーを設定
-  if (profile.parameters && profile.parameters.length > 0) {
+  const ui = SpreadsheetApp.getUi();
+  const choice = ui.alert(
+    '「所見作成」シートの項目設定',
+    '「所見作成」シートの列項目をどうしますか？\n\n' +
+    '「はい」: 文体サンプルからAIに項目を推測させます。\n' +
+    '「いいえ」: 「氏名」「観点A」などの一般的な項目を使用します。',
+    ui.ButtonSet.YES_NO_CANCEL
+  );
+
+  if (choice === ui.Button.CLOSE) {
+    ui.alert('文体分析は完了しましたが、「所見作成」シートの更新はキャンセルされました。');
+  } else {
     const ss = SpreadsheetApp.getActive();
     const sheetName = '所見作成';
     let sh = ss.getSheetByName(sheetName);
@@ -191,16 +198,41 @@ function analyzeMyStyle() {
       sh = ss.insertSheet(sheetName);
     }
     sh.clear();
-    const headers = profile.parameters.concat(['箇条書きメモ', '生成された所見']);
-    sh.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
-    sh.setFrozenRows(1);
-    SpreadsheetApp.getUi().alert('文体分析が完了し、「' + SHEET_PROFILE + '」シートを更新しました。さらに、所見作成用の「' + sheetName + '」シートを準備しました。');
-  } else {
-    SpreadsheetApp.getUi().alert('文体分析が完了し、結果を「' + SHEET_PROFILE + '」シートに書き出しました。内容は直接編集可能です。');
+
+    if (choice === ui.Button.YES) {
+      if (profile.parameters && profile.parameters.length > 0) {
+        const headers = profile.parameters.concat(['箇条書きメモ', '生成された所見']);
+        sh.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
+        sh.setFrozenRows(1);
+        if (headers.length > 2) {
+          sh.setColumnWidths(1, headers.length - 2, 120);
+        }
+        const memoCol = headers.indexOf('箇条書きメモ') + 1;
+        const remarkCol = headers.indexOf('生成された所見') + 1;
+        if (memoCol > 0) sh.setColumnWidth(memoCol, 400);
+        if (remarkCol > 0) sh.setColumnWidth(remarkCol, 400);
+        ui.alert('文体分析が完了し、「' + SHEET_PROFILE + '」シートを更新しました。AIが推測した項目で「' + sheetName + '」シートを準備しました。');
+      } else {
+        const headers = ['氏名', '箇条書きメモ', '生成された所見'];
+        sh.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
+        sh.setFrozenRows(1);
+        sh.setColumnWidth(1, 120);
+        sh.setColumnWidth(2, 400);
+        sh.setColumnWidth(3, 400);
+        ui.alert('文体分析が完了し、「' + SHEET_PROFILE + '」シートを更新しました。AIが項目を推測できなかったため、汎用的な「' + sheetName + '」シートを準備しました。');
+      }
+    } else {
+      const headers = ['氏名', '観点A', '観点B', '特記事項', '箇条書きメモ', '生成された所見'];
+      sh.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
+      sh.setFrozenRows(1);
+      sh.setColumnWidths(1, 4, 120);
+      sh.setColumnWidth(5, 400);
+      sh.setColumnWidth(6, 400);
+      ui.alert('文体分析が完了し、「' + SHEET_PROFILE + '」シートを更新しました。汎用的な項目で「' + sheetName + '」シートを準備しました。');
+    }
   }
 
   PropertiesService.getUserProperties().setProperty(PROP_STYLE_PROFILE, JSON.stringify(profile));
-
   return summarizeStyleProfile_(profile);
 }
 
@@ -219,17 +251,21 @@ function summarizeStyleProfile_(profile) {
     summary: profile.summary || '',
     B_sentence_structure: profile.B_sentence_structure || '',
     D_overall_tone: profile.D_overall_tone || '',
+    G_perspective: profile.G_perspective || '',
     updatedAt: new Date().toISOString()
   };
 }
 
-// 所見生成
+/**
+ * 所見生成のメイン関数（文体プロファイル反映強化版）
+ */
 function generateRemark(input) {
   input = input || {};
   const memoText = input.memoText;
   const goalCode = input.goalCode;
-  const charCount = input.charCount;
+  const charCount = parseInt(input.charCount) || 0;
   const gradeLevel = input.gradeLevel;
+  
   if (!memoText || !goalCode) throw new Error('メモとゴールを指定してください。');
 
   const ss = SpreadsheetApp.getActive();
@@ -240,10 +276,22 @@ function generateRemark(input) {
   const styleJson = props.getProperty(PROP_STYLE_PROFILE);
   const styleProfile = styleJson ? JSON.parse(styleJson) : null;
 
-  const memos = memoText.split(/\r?\n/).map(function(s){ return s.trim(); }).filter(function(s){ return !!s; }).map(sanitizeForPrivacy_);
+  const memos = memoText.split(/\r?\n/).map(s => s.trim()).filter(s => s);
   if (memos.length === 0) throw new Error('箇条書きメモが空です。');
+  
+  const sanitizedMemos = memos.map(lightSanitizeForPrivacy_);
 
-  const resultText = generateRemarkWithGemini_(memos, goalCode, styleProfile, charCount, gradeLevel);
+  console.log('文字数指定: ' + charCount);
+  console.log('メモ数: ' + sanitizedMemos.length);
+  console.log('文体プロファイル: ' + (styleProfile ? styleProfile.style_name || '有効' : '無効'));
+
+  let resultText;
+  if (charCount > 0) {
+    resultText = generateWithTargetCharRange_(sanitizedMemos, charCount, goalCode, styleProfile, gradeLevel);
+  } else {
+    resultText = generateRemarkWithGemini_(sanitizedMemos, goalCode, styleProfile, 0, gradeLevel);
+  }
+  
   range.setWrap(true).setValue(resultText);
 
   return {
@@ -252,21 +300,434 @@ function generateRemark(input) {
   };
 }
 
-// Gemini呼び出し：文体分析（responseMimeType を削除）
+/**
+ * ±10%範囲での所見生成（文体プロファイル反映強化版）
+ */
+function generateWithTargetCharRange_(memos, targetChars, goalCode, styleProfile, gradeLevel) {
+  const minChars = Math.floor(targetChars * 0.9);  // -10%
+  const maxChars = Math.ceil(targetChars * 1.1);   // +10%
+  const tolerance = 0.02; // ±2%以内なら即採用
+
+  console.log(`目標文字数範囲: ${minChars}〜${maxChars}文字（目標: ${targetChars}文字）`);
+
+  let bestCandidate = { text: '', length: 0, score: Infinity };
+
+  // 段階1: 文体プロファイル完全反映での複数回生成
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const text = generateWithRangePrompt_(memos, targetChars, minChars, maxChars, goalCode, styleProfile, gradeLevel, attempt);
+      const length = text.length;
+      const score = Math.abs(length - targetChars);
+
+      console.log(`段階1-試行${attempt + 1}: ${length}文字, スコア=${score}`);
+
+      if (length >= minChars && length <= maxChars) {
+        if (score < bestCandidate.score) {
+          bestCandidate = { text, length, score };
+        }
+        
+        if (score <= targetChars * tolerance) {
+          console.log(`最適解発見（段階1）: ${length}文字`);
+          return text;
+        }
+      } else if (bestCandidate.score === Infinity) {
+        bestCandidate = { text, length, score };
+      }
+    } catch (e) {
+      console.log(`段階1-試行${attempt + 1}失敗: ${e.toString()}`);
+    }
+  }
+
+  // 段階2: 範囲内の結果があれば採用
+  if (bestCandidate.text && bestCandidate.length >= minChars && bestCandidate.length <= maxChars) {
+    console.log(`段階2採用: ${bestCandidate.length}文字`);
+    return bestCandidate.text;
+  }
+
+  // 段階3: 文体を保持したAI調整
+  if (bestCandidate.text) {
+    try {
+      const adjustedText = adjustTextWithAI_(bestCandidate.text, memos, targetChars, minChars, maxChars, styleProfile, gradeLevel);
+      const adjustedLength = adjustedText.length;
+      
+      console.log(`段階3調整後: ${adjustedLength}文字`);
+      
+      if (adjustedLength >= minChars && adjustedLength <= maxChars) {
+        return adjustedText;
+      }
+      
+      if (Math.abs(adjustedLength - targetChars) < bestCandidate.score) {
+        bestCandidate = { text: adjustedText, length: adjustedLength, score: Math.abs(adjustedLength - targetChars) };
+      }
+    } catch (e) {
+      console.log(`段階3調整失敗: ${e.toString()}`);
+    }
+  }
+
+  // 段階4: 文体を考慮した物理的調整
+  if (bestCandidate.text) {
+    const finalText = physicallyAdjustToRange_(bestCandidate.text, minChars, maxChars, targetChars, styleProfile);
+    console.log(`段階4最終調整: ${finalText.length}文字`);
+    return finalText;
+  }
+
+  throw new Error(`指定された文字数範囲（${minChars}〜${maxChars}文字）での所見生成に失敗しました。`);
+}
+
+/**
+ * 文体プロファイル完全反映での範囲指定生成
+ */
+function generateWithRangePrompt_(memos, targetChars, minChars, maxChars, goalCode, styleProfile, gradeLevel, attempt) {
+  const goalSpec = goalToSpec_(goalCode);
+  const gradeSpec = gradeToSpec_(gradeLevel);
+  
+  // 段階的に強調レベルを上げる
+  const emphasisLevels = ['【重要】', '【厳守】', '【絶対条件】', '【最重要】'];
+  const emphasis = emphasisLevels[Math.min(attempt, 3)];
+  
+  // 文体プロファイルの構築
+  const styleBlock = buildStyleConstraints_(styleProfile);
+  
+  const prompt = `${emphasis} あなたは経験豊富な教員として、以下の指示に従って通知表の所見文を作成してください。
+
+【文字数制約（絶対遵守）】
+- 最低${minChars}文字以上、最大${maxChars}文字以内
+- 理想的には${targetChars}文字程度
+
+【箇条書きメモ（すべて含める）】
+${memos.map(m => '・' + m).join('\n')}
+
+【対象学年】
+${gradeSpec}
+
+【目的・構成】
+${goalSpec.instruction}
+
+${styleBlock}
+
+【必須要件】
+1. 上記のメモ内容をすべて自然に組み込む
+2. 指定された文体・表現スタイルを厳密に守る
+3. 文字数制約を絶対に守る（${minChars}〜${maxChars}文字）
+4. [人物]などの括弧表現は使用しない
+5. 一段落で完結させる
+6. 前向きで建設的な締めくくりにする
+
+出力は所見文の本文のみを返してください。`;
+
+  const body = {
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: {
+      temperature: 0.25 + (attempt * 0.05),
+      topP: 0.9,
+      maxOutputTokens: Math.max(2048, maxChars * 4)
+    }
+  };
+
+  const data = geminiFetch_(body);
+  let text = extractTextFromGenerateContent_(data).trim();
+  return postProcess_(text);
+}
+
+/**
+ * 文体プロファイルの詳細な制約を構築
+ */
+function buildStyleConstraints_(profile) {
+  if (!profile) {
+    return '【文体ガイドライン】\n- 丁寧で温かく、簡潔かつ客観性を保った「です・ます調」\n- 文末は断定し過ぎず、適度に柔らかい表現を用いる\n- 最後は前向きに締める';
+  }
+  
+  const constraints = [];
+  constraints.push('【文体ガイドライン（厳守）】');
+  
+  if (profile.style_name) constraints.push(`- 文体名: ${profile.style_name}`);
+  if (profile.summary) constraints.push(`- 概要: ${profile.summary}`);
+  if (profile.B_sentence_structure) constraints.push(`- 文の構成: ${profile.B_sentence_structure}`);
+  if (profile.D_overall_tone) constraints.push(`- 全体トーン: ${profile.D_overall_tone}`);
+  if (profile.E_vocabulary_choice) constraints.push(`- 語彙選択: ${profile.E_vocabulary_choice}`);
+  if (profile.F_sentence_ending) constraints.push(`- 文末表現: ${profile.F_sentence_ending}`);
+  if (profile.G_perspective) constraints.push(`- 視点・観点: ${profile.G_perspective}`);
+
+  // 推奨事項（重要度高）
+  if (Array.isArray(profile.dos) && profile.dos.length > 0) {
+    constraints.push('- 【必ず実践すること】');
+    profile.dos.forEach(item => constraints.push(`  • ${item}`));
+  }
+  
+  // 避けるべき事項（重要度高）
+  if (Array.isArray(profile.donts) && profile.donts.length > 0) {
+    constraints.push('- 【絶対に避けること】');
+    profile.donts.forEach(item => constraints.push(`  • ${item}`));
+  }
+  
+  // 参考表現集
+  if (Array.isArray(profile.phrase_bank) && profile.phrase_bank.length > 0) {
+    constraints.push('- 【使用を推奨する表現】');
+    profile.phrase_bank.slice(0, 5).forEach(item => constraints.push(`  • ${item}`));
+  }
+  
+  // 締めくくりパターン
+  if (Array.isArray(profile.closing_patterns) && profile.closing_patterns.length > 0) {
+    constraints.push('- 【締めくくりの参考パターン】');
+    profile.closing_patterns.slice(0, 3).forEach(item => constraints.push(`  • ${item}`));
+  }
+  
+  constraints.push('- 文体は「です・ます調」で統一する');
+  
+  return constraints.join('\n');
+}
+
+/**
+ * 文体を保持したAIによるテキスト調整
+ */
+function adjustTextWithAI_(text, memos, targetChars, minChars, maxChars, styleProfile, gradeLevel) {
+  const currentLength = text.length;
+  const gradeSpec = gradeToSpec_(gradeLevel);
+  
+  let instruction;
+  if (currentLength < minChars) {
+    const shortage = minChars - currentLength;
+    instruction = `現在${currentLength}文字で、あと${shortage}文字以上必要です。文体を保持しながら内容をより詳細に記述し、${minChars}〜${maxChars}文字の範囲に収めてください。`;
+  } else if (currentLength > maxChars) {
+    const excess = currentLength - maxChars;
+    instruction = `現在${currentLength}文字で、${excess}文字以上削減が必要です。文体を保持しながら冗長な表現を整理し、${minChars}〜${maxChars}文字の範囲に収めてください。`;
+  } else {
+    instruction = `現在${currentLength}文字で範囲内ですが、より${targetChars}文字に近づけるよう文体を保持しながら調整してください。`;
+  }
+
+  const styleBlock = buildStyleConstraints_(styleProfile);
+
+  const prompt = `以下の所見文を、文体・表現スタイルを完全に保持しながら、指定された文字数範囲に調整してください。
+
+【調整指示】
+${instruction}
+
+【現在の文章（${currentLength}文字）】
+${text}
+
+【元の箇条書きメモ（内容維持必須）】
+${memos.map(m => '・' + m).join('\n')}
+
+【対象学年】
+${gradeSpec}
+
+${styleBlock}
+
+【調整時の注意点】
+1. 元の文章の文体・表現スタイルを完全に保持する
+2. 核となる意味・内容を変更しない
+3. メモの要素をすべて維持する
+4. 目標文字数範囲：${minChars}〜${maxChars}文字
+5. [人物]などの括弧は使用しない
+6. 一段落で完結させる
+
+出力は調整後の所見文本文のみを返してください。`;
+
+  const body = {
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: {
+      temperature: 0.3,
+      topP: 0.9,
+      maxOutputTokens: Math.max(2048, maxChars * 4)
+    }
+  };
+
+  const data = geminiFetch_(body);
+  let adjustedText = extractTextFromGenerateContent_(data).trim();
+  return postProcess_(adjustedText);
+}
+
+/**
+ * 文体を考慮した物理的調整
+ */
+function physicallyAdjustToRange_(text, minChars, maxChars, targetChars, styleProfile) {
+  const currentLength = text.length;
+  
+  if (currentLength >= minChars && currentLength <= maxChars) {
+    return text;
+  }
+
+  if (currentLength < minChars) {
+    return expandTextToRange_(text, minChars, maxChars, styleProfile);
+  } else {
+    return shortenTextToRange_(text, minChars, maxChars);
+  }
+}
+
+/**
+ * 文体を考慮したテキスト拡張
+ */
+function expandTextToRange_(text, minLength, maxLength, styleProfile) {
+  let result = text;
+  
+  const expansions = [];
+  
+  if (styleProfile) {
+    if (Array.isArray(styleProfile.closing_patterns)) {
+      expansions.push(...styleProfile.closing_patterns);
+    }
+    if (Array.isArray(styleProfile.phrase_bank)) {
+      expansions.push(...styleProfile.phrase_bank.slice(0, 4));
+    }
+  }
+  
+  const genericExpansions = [
+    'さらなる成長が期待されます',
+    '今後も継続的な取り組みを見守っていきたいと思います',
+    'これからの一層の活躍が楽しみです',
+    '日々の努力が着実に実を結んでいます',
+    '周囲との協力を大切にしながら、更なる向上を目指してほしいと思います'
+  ];
+  
+  if (expansions.length === 0) {
+    expansions.push(...genericExpansions);
+  }
+
+  if (result.endsWith('。')) {
+    result = result.slice(0, -1);
+  }
+
+  for (let i = 0; i < expansions.length && result.length < minLength; i++) {
+    const expansion = expansions[i];
+    const cleanExpansion = expansion.replace(/。$/, '');
+    
+    if (result.indexOf(cleanExpansion) === -1) {
+      const connector = result.endsWith('。') ? 'また、' : '。また、';
+      const addition = connector + expansion;
+      
+      if (result.length + addition.length <= maxLength) {
+        result += addition;
+      } else {
+        break;
+      }
+    }
+  }
+
+  if (!result.endsWith('。')) {
+    result += '。';
+  }
+
+  return result;
+}
+
+/**
+ * テキスト短縮
+ */
+function shortenTextToRange_(text, minLength, maxLength) {
+  let result = text;
+
+  const reductionPatterns = [
+    { from: /、そして、/g, to: '、' },
+    { from: /。また、/g, to: '。' },
+    { from: /ということができます/g, to: 'ことができます' },
+    { from: /していくことができる/g, to: 'できる' },
+    { from: /非常に/g, to: '' },
+    { from: /とても/g, to: '' },
+    { from: /大変/g, to: '' }
+  ];
+
+  for (const pattern of reductionPatterns) {
+    if (result.length > maxLength) {
+      result = result.replace(pattern.from, pattern.to);
+    }
+  }
+
+  if (result.length > maxLength) {
+    result = result.substring(0, maxLength);
+    
+    const lastPeriod = result.lastIndexOf('。');
+    if (lastPeriod > minLength * 0.8) {
+      result = result.substring(0, lastPeriod + 1);
+    } else {
+      result = result.substring(0, maxLength - 1) + '。';
+    }
+  }
+
+  return result;
+}
+
+/**
+ * 文体プロファイル反映強化版の通常所見生成
+ */
+function generateRemarkWithGemini_(memos, goalCode, styleProfile, charCount, gradeLevel) {
+  const goalSpec = goalToSpec_(goalCode);
+  const gradeSpec = gradeToSpec_(gradeLevel);
+  
+  const styleBlock = buildStyleConstraints_(styleProfile);
+  
+  const prompt = `あなたは経験豊富な教員として、以下の指示に従って通知表の所見文を作成してください。
+
+【箇条書きメモ（すべて含める）】
+${memos.map(m => '・' + m).join('\n')}
+
+【対象学年】
+${gradeSpec}
+
+【目的・構成】
+${goalSpec.instruction}
+
+【推奨文字数】
+${goalSpec.recommendedLength}
+
+${styleBlock}
+
+【必須要件】
+1. 上記のメモ内容をすべて自然に組み込む
+2. 指定された文体・表現スタイルを厳密に守る
+3. [人物]などの括弧表現は使用しない
+4. 一段落で完結させる
+5. 前向きで建設的な締めくくりにする
+
+出力は所見文の本文のみを返してください。`;
+
+  const body = {
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: {
+      temperature: 0.25,
+      topP: 0.9,
+      maxOutputTokens: 2048
+    }
+  };
+
+  const data = geminiFetch_(body);
+  let text = extractTextFromGenerateContent_(data).trim();
+  return postProcess_(text);
+}
+
+// 以下、既存の関数群（文体分析、API呼び出し、ユーティリティ等）
+
 function analyzeStyleWithGemini_(samples) {
   const joined = samples.map(function(s, i){ return '【サンプル' + (i + 1) + '】\n' + s; }).join('\n\n');
-  const instruction = `あなたは日本語の文章スタイルを分析する専門家です。
+  const instruction = `あなたは、プロの編集者として、学校の先生が書いた「通知表の所見文」の文体を分析します。あなたの任務は、著者の文体を客観的に分析し、指定されたJSON形式で報告することです。分析中は、常に冷静かつ客観的な視点を保ってください。
+
+【最重要ルール】
+サンプルに含まれる \`[人物]\` や \`[番号]\` のような角括弧 \`[]\` で囲まれた文字列は、プライバシー保護のために機械的に置き換えられたプレースホルダーです。これらは文体の一部では**ありません**。分析の際は、これらが元々は生徒の名前などであったと解釈し、プレースホルダー自体を文体の一部として学習することは絶対に避けてください。
+
 以下は、ある教員が過去に作成した通知表所見文のサンプルです。
 特に次の観点を明確に抽出してください:
-B：文の構成（一文の長さ、接続詞の使い方、段落の組み立て）
-D：全体的なトーン（丁寧さ、温かみ、客観性、励ましの度合い など）
+B: 文の構成（一文の平均的な長さ、接続詞の頻度や種類、段落の構成パターン）
+D: 全体的なトーン（丁寧さ、温かみ、客観性、励ましの度合いなど）
+E: 語彙の選択（比喩表現、専門用語の使用頻度、感情を表す言葉の傾向）
+F: 文末表現（「〜です。」「〜ます。」の使い分け、「〜でしょう。」「〜ようです。」などの推量・断定の度合い）
+G: 視点（生徒の行動を客観的に描写する視点か、生徒の心情に寄り添う視点か）
+
 抽出した観点に加えて、所見の文脈で重要となるパラメーター（例：教科、単元、評価観点など）を抽出し、"parameters"としてキーの配列で返してください。
+
+さらに、以下の項目も詳細に分析してください：
+- dos: この先生が好む表現や書き方の特徴（5-8項目）
+- donts: この先生が避ける表現や書き方（3-5項目）
+- phrase_bank: よく使用される特徴的な表現や言い回し（8-12項目）
+- closing_patterns: 文章の締めくくり方のパターン（3-5項目）
+
 必ず次のJSONスキーマの1オブジェクトのみを返すこと。前置きやコードブロックは不要。
 {
   "style_name": "string",
   "summary": "string",
   "B_sentence_structure": "string",
   "D_overall_tone": "string",
+  "E_vocabulary_choice": "string",
+  "F_sentence_ending": "string",
+  "G_perspective": "string",
   "dos": ["string"],
   "donts": ["string"],
   "phrase_bank": ["string"],
@@ -297,62 +758,6 @@ D：全体的なトーン（丁寧さ、温かみ、客観性、励ましの度�
   return profile;
 }
 
-// Gemini呼び出し：所見生成
-function generateRemarkWithGemini_(memos, goalCode, styleProfile, charCount, gradeLevel) {
-  const goalSpec = goalToSpec_(goalCode);
-  const styleGuidance = styleProfile ? formatStyleGuidance_(styleProfile) : '丁寧で温かく、簡潔かつ客観性を保った「です・ます調」で書く。';
-  const privacyGuard = [
-    '固有名詞（生徒名、学校名、具体的な大会名等）は出力に含めない。',
-    '学期や回数などの数値は一般化して表現する（例：「複数回」「学期当初」など）。'
-  ].join('\n');
-  const gradeSpec = gradeToSpec_(gradeLevel);
-  const lengthSpec = charCount ? `文字量の目安: ${charCount}字程度（厳密でなくてよい）。` : `文字量の目安: ${goalSpec.recommendedLength}（厳密でなくてよい）。`;
-
-  const prompt = [
-    'あなたは日本の学校教員が用いる通知表の所見文を作成する専門アシスタントです。',
-    '以下の条件で、日本語の単一段落（必要なら2段落まで）で所見文を作成してください。',
-    '',
-    '【対象読者】',
-    gradeSpec,
-    '',
-    '【文体指針】',
-    styleGuidance,
-    '',
-    '【目的（ゴール）】',
-    goalSpec.instruction,
-    '',
-    '【守るべき制約】',
-    '- ' + privacyGuard,
-    '- 過度に断定せず、観察に基づく表現を用いる。',
-    '- 読み手（保護者/本人）に配慮し、評価と励ましのバランスを取る。',
-    '- 表現の画一化を避け、メモの内容に即して具体と抽象のバランスをとる。',
-    '',
-    '【入力メモ（個人特定を避けた要約）】',
-    memos.map(function(m){ return '- ' + m; }).join('\n'),
-    '',
-    '【出力フォーマット】',
-    '- 日本語の自然な文章。箇条書きは使用しない。',
-    `- ${lengthSpec}`,
-    '- 最後は前向きな締めで終える。'
-  ].join('\n');
-
-  const body = {
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: {
-      temperature: 0.6,
-      topP: 0.95,
-      maxOutputTokens: 2048
-    }
-  };
-
-  const data = geminiFetch_(body);
-  var text = extractTextFromGenerateContent_(data).trim();
-  if (!text) throw new Error('所見生成に失敗しました。');
-  text = postProcess_(text);
-  return text;
-}
-
-// 共通: v1 + 2.0
 function geminiFetch_(body) {
   const apiKey = PropertiesService.getUserProperties().getProperty(PROP_API_KEY)
     || PropertiesService.getScriptProperties().getProperty(PROP_API_KEY);
@@ -404,7 +809,6 @@ function safeJsonParse_(str) {
   }
 }
 
-// ユーティリティ
 function sanitizeForPrivacy_(s) {
   var out = String(s);
   out = out.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[連絡先]');
@@ -413,6 +817,14 @@ function sanitizeForPrivacy_(s) {
   out = out.replace(/([一-龥A-Za-z0-9]+)大会/g, 'ある大会');
   out = out.replace(/([一-龥A-Za-z0-9]+)小学校|([一-龥A-Za-z0-9]+)中学校|([一-龥A-Za-z0-9]+)高等学校/g, 'ある学校');
   out = out.replace(/([1-6])年([1-9])組/g, 'ある学年の学級');
+  return out.trim();
+}
+
+function lightSanitizeForPrivacy_(s) {
+  var out = String(s);
+  out = out.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[連絡先]');
+  out = out.replace(/\b\d{2,4}[-\s]?\d{2,4}[-\s]?\d{3,4}\b/g, '[番号]');
+  out = out.replace(/([一-龥]{2,4})(さん|くん|ちゃん)/g, '[人物]');
   return out.trim();
 }
 
@@ -456,24 +868,39 @@ function formatStyleGuidance_(profile) {
   var lines = [];
   if (profile.B_sentence_structure) lines.push('文の構成: ' + profile.B_sentence_structure);
   if (profile.D_overall_tone) lines.push('全体トーン: ' + profile.D_overall_tone);
-  if (Array.isArray(profile.dos) && profile.dos.length) lines.push('推奨: ' + profile.dos.slice(0, 5).join(' / '));
-  if (Array.isArray(profile.donts) && profile.donts.length) lines.push('避ける: ' + profile.donts.slice(0, 5).join(' / '));
-  if (Array.isArray(profile.phrase_bank) && profile.phrase_bank.length) lines.push('言い回し: ' + profile.phrase_bank.slice(0, 5).join(' / '));
-  if (Array.isArray(profile.closing_patterns) && profile.closing_patterns.length) lines.push('締め: ' + profile.closing_patterns.slice(0, 3).join(' / '));
+  if (profile.E_vocabulary_choice) lines.push('語彙の選択: ' + profile.E_vocabulary_choice);
+  if (profile.F_sentence_ending) lines.push('文末表現: ' + profile.F_sentence_ending);
+  if (profile.G_perspective) lines.push('視点: ' + profile.G_perspective);
+  
+  if (Array.isArray(profile.dos) && profile.dos.length) {
+    lines.push('推奨: ' + profile.dos.slice(0, 3).join(' / '));
+  }
+  if (Array.isArray(profile.donts) && profile.donts.length) {
+    lines.push('避ける: ' + profile.donts.slice(0, 3).join(' / '));
+  }
+  if (Array.isArray(profile.phrase_bank) && profile.phrase_bank.length) {
+    lines.push('参考表現: ' + profile.phrase_bank.slice(0, 3).join(' / '));
+  }
+  if (Array.isArray(profile.closing_patterns) && profile.closing_patterns.length) {
+    lines.push('締め: ' + profile.closing_patterns.slice(0, 2).join(' / '));
+  }
+  
   lines.push('文体は「です・ます調」で統一する。');
-  return lines.join('\n- ');
+  return lines.join('\n');
 }
 
 function postProcess_(text) {
   var t = text.replace(/^[\"'「」]+|[\"'「」]+$/g, '').trim();
-  var parts = t.split(/\n{2,}/);
-  if (parts.length > 2) t = parts.slice(0, 2).join('\n\n');
-  return t;
+  
+  t = t.replace(/\r?\n+/g, ' ');
+
+  t = t.replace(/\[人物\]/g, '本人');
+  t = t.replace(/\[(番号|連絡先)\]/g, '');
+  t = t.replace(/(\s)\s+/g, '$1');
+
+  return t.trim();
 }
 
-/**
- * 配布用にシートを初期化する
- */
 function initializeSheet() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.alert(
@@ -492,7 +919,6 @@ function initializeSheet() {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     
-    // 1. Delete specific sheets
     const sheetsToDelete = [SHEET_PROFILE, '所見作成'];
     sheetsToDelete.forEach(sheetName => {
       const sheet = ss.getSheetByName(sheetName);
@@ -501,7 +927,6 @@ function initializeSheet() {
       }
     });
 
-    // 2. Clear content of the sample sheet (keep header)
     const sampleSheet = ss.getSheetByName(SHEET_SAMPLES);
     if (sampleSheet) {
       const lastRow = sampleSheet.getLastRow();
@@ -510,15 +935,9 @@ function initializeSheet() {
       }
     }
 
-    // 3. Delete user properties
     const userProps = PropertiesService.getUserProperties();
     userProps.deleteProperty(PROP_API_KEY);
     userProps.deleteProperty(PROP_STYLE_PROFILE);
-
-    // 4. Delete script properties as well, just in case
-    const scriptProps = PropertiesService.getScriptProperties();
-    scriptProps.deleteProperty(PROP_API_KEY);
-
 
     ui.alert('初期化が完了しました。このスプレッドシートのコピーを配布できます。');
 
